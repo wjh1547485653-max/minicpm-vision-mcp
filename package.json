@@ -1,14 +1,15 @@
 {
   "name": "minicpm-vision-mcp",
-  "version": "2.0.0",
-  "description": "Local vision MCP server for DeepSeek/Claude — image description + video frame analysis via Ollama + MiniCPM-V 4.6",
+  "version": "2.2.0",
+  "description": "Local vision MCP server for DeepSeek/Claude — image description + video frame analysis + audio transcription via Ollama + MiniCPM-V 4.6 + faster-whisper",
   "main": "vision_mcp_server.mjs",
   "type": "module",
   "bin": {
     "minicpm-vision-mcp": "./vision_mcp_server.mjs"
   },
   "files": [
-    "vision_mcp_server.mjs"
+    "vision_mcp_server.mjs",
+    "transcribe_audio.py"
   ],
   "keywords": [
     "mcp",
@@ -18,6 +19,8 @@
     "deepseek",
     "video-analysis",
     "image-description",
+    "audio-transcription",
+    "whisper",
     "model-context-protocol",
     "ai-agent",
     "local-ai"
