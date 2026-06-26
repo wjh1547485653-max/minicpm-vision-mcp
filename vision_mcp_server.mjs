@@ -12,13 +12,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const MODEL = "minicpm-v4.6";
 const OLLAMA = { hostname: "127.0.0.1", port: 11434 };
 const FRAME_DIR = join(__dirname, "_vision_frames");
-const INTERVAL = 8;
+const INTERVAL = 8; // seconds between frames
 
+// --- ffmpeg path ---
 let _ffmpegPath = null;
 function getFfmpegPath() {
   if (_ffmpegPath) return _ffmpegPath;
+  // Try npm-installed ffmpeg binary
   const pkgPath = join(__dirname, "node_modules", "@ffmpeg-installer", "win32-x64", "ffmpeg.exe");
   if (existsSync(pkgPath)) { _ffmpegPath = pkgPath; return pkgPath; }
+  // Fallback: assume ffmpeg on PATH
   _ffmpegPath = "ffmpeg";
   return _ffmpegPath;
 }
@@ -32,6 +35,7 @@ function run(cmd, ignoreError) {
   }
 }
 
+// --- Ollama vision ---
 function cleanOutput(text) {
   return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 }
@@ -54,6 +58,7 @@ async function ollamaGenerate(prompt, imagesBase64) {
   });
 }
 
+// --- Image description ---
 const IMAGE_PROMPT = "请详细描述这张图片的内容。用中文回复。";
 const FRAME_PROMPT = "用一句话概括这个画面：1.核心内容是什么 2.有哪些关键文字。不要描述UI布局细节。用中文。";
 
@@ -63,6 +68,7 @@ async function describeImage(imagePath) {
   return ollamaGenerate(IMAGE_PROMPT, [b64]);
 }
 
+// --- Video analysis ---
 function getDuration(filePath) {
   const out = run(`"${getFfmpegPath()}" -i "${filePath}" 2>&1`, true);
   const m = out.match(/Duration: (\d+):(\d+):(\d+)\.(\d+)/);
@@ -73,9 +79,12 @@ function getDuration(filePath) {
 function extractFrames(videoPath, interval) {
   const dur = getDuration(videoPath);
   const frameCount = Math.ceil(dur / interval);
+
   if (existsSync(FRAME_DIR)) rmSync(FRAME_DIR, { recursive: true });
   mkdirSync(FRAME_DIR, { recursive: true });
+
   run(`"${getFfmpegPath()}" -i "${videoPath}" -vf "fps=1/${interval}" -q:v 2 "${FRAME_DIR}/f_%04d.jpg" -y`);
+
   const files = run(`cmd /c "dir /b "${FRAME_DIR}""`).trim().split(/\r?\n/).filter(f => f).map(f => join(FRAME_DIR, f));
   return { files, duration: dur, frameCount };
 }
@@ -105,6 +114,7 @@ async function describeVideo(videoPathOrUrl, interval) {
   let videoPath = videoPathOrUrl;
   let downloaded = false;
 
+  // Download if URL
   if (videoPathOrUrl.startsWith("http://") || videoPathOrUrl.startsWith("https://")) {
     const dest = join(__dirname, `_temp_video_${Date.now()}.mp4`);
     videoPath = await downloadFile(videoPathOrUrl, dest);
@@ -115,6 +125,7 @@ async function describeVideo(videoPathOrUrl, interval) {
 
   const { files, duration, frameCount } = extractFrames(videoPath, interval);
 
+  // Analyze each frame with concise prompt
   const results = [];
   for (let i = 0; i < files.length; i++) {
     const sec = Math.min((i + 1) * interval, duration);
@@ -126,6 +137,7 @@ async function describeVideo(videoPathOrUrl, interval) {
     }
   }
 
+  // Secondary summary
   let finalSummary = "";
   try {
     const allDescs = results.map(r => `[${r.time}s] ${r.description}`).join("\n");
@@ -135,6 +147,7 @@ async function describeVideo(videoPathOrUrl, interval) {
     ));
   } catch (e) { finalSummary = "(摘要生成失败)"; }
 
+  // Build output
   let output = `视频时长: ${duration}秒 | 分析帧数: ${results.length} | 间隔: ${interval}秒\n`;
   output += "=".repeat(50) + "\n";
   for (const r of results) {
@@ -143,13 +156,71 @@ async function describeVideo(videoPathOrUrl, interval) {
   output += "\n" + "=".repeat(50) + "\n";
   output += `📝 **总结**: ${finalSummary}\n`;
 
+  // Cleanup
   if (existsSync(FRAME_DIR)) rmSync(FRAME_DIR, { recursive: true });
   if (downloaded && existsSync(videoPath)) rmSync(videoPath);
 
   return output;
 }
 
-const server = new Server({ name: "minicpm-vision", version: "2.0.0" }, { capabilities: { tools: {} } });
+// --- Audio extraction ---
+function extractAudio(videoPath) {
+  const audioPath = join(__dirname, `_temp_audio_${Date.now()}.mp3`);
+  run(`"${getFfmpegPath()}" -i "${videoPath}" -vn -ar 16000 -ac 1 -b:a 64k "${audioPath}" -y`);
+  return audioPath;
+}
+
+function getAudioInfo(filePath) {
+  const out = run(`"${getFfmpegPath()}" -i "${filePath}" 2>&1`, true);
+  const durM = out.match(/Duration: (\d+):(\d+):(\d+)\.(\d+)/);
+  const audioM = out.match(/Stream #\d+:\d+.*Audio: (\w+).*, (\d+) Hz, (\w+)/);
+  const duration = durM ? parseInt(durM[1])*3600 + parseInt(durM[2])*60 + parseInt(durM[3]) : 0;
+  return {
+    duration,
+    codec: audioM?.[1] || 'unknown',
+    sampleRate: audioM?.[2] || 'unknown',
+    channels: audioM?.[3] || 'unknown'
+  };
+}
+
+async function describeAudio(videoPathOrUrl) {
+  let videoPath = videoPathOrUrl;
+  let downloaded = false;
+  let audioPath = null;
+
+  if (videoPathOrUrl.startsWith("http://") || videoPathOrUrl.startsWith("https://")) {
+    const dest = join(__dirname, `_temp_video_${Date.now()}.mp4`);
+    videoPath = await downloadFile(videoPathOrUrl, dest);
+    downloaded = true;
+  }
+
+  if (!existsSync(videoPath)) throw new Error(`File not found: ${videoPath}`);
+
+  // If already an audio file, analyze directly
+  const ext = videoPath.split('.').pop().toLowerCase();
+  if (['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac'].includes(ext)) {
+    audioPath = videoPath;
+  } else {
+    audioPath = extractAudio(videoPath);
+  }
+
+  const info = getAudioInfo(audioPath);
+  const sizeMB = (readFileSync(audioPath).length / (1024*1024)).toFixed(1);
+
+  let output = `🎵 音频分析\n`;
+  output += `时长: ${info.duration}秒 | 编码: ${info.codec} | 采样率: ${info.sampleRate}Hz | 声道: ${info.channels}\n`;
+  output += `文件大小: ${sizeMB}MB\n`;
+  output += `\n⚠️ 语音转文字需要 whisper 模型（faster-whisper 安装中）。当前提供音频元数据。\n`;
+  output += `音频已提取到: ${audioPath}\n`;
+
+  // Cleanup
+  if (downloaded && existsSync(videoPath)) rmSync(videoPath);
+
+  return output;
+}
+
+// --- MCP Server ---
+const server = new Server({ name: "minicpm-vision", version: "2.1.0" }, { capabilities: { tools: {} } });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
@@ -173,6 +244,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         },
         required: ["path"]
       }
+    },
+    {
+      name: "describe_audio",
+      description: "提取视频/音频文件的音频轨道，分析音频元数据（时长、编码、采样率等）。支持本地文件路径或 HTTP/HTTPS URL。",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string", description: "视频或音频文件的绝对路径，或 HTTP/HTTPS URL" }
+        },
+        required: ["path"]
+      }
     }
   ]
 }));
@@ -186,6 +268,10 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     if (req.params.name === "describe_video") {
       const summary = await describeVideo(req.params.arguments.path, req.params.arguments.interval);
       return { content: [{ type: "text", text: summary }] };
+    }
+    if (req.params.name === "describe_audio") {
+      const result = await describeAudio(req.params.arguments.path);
+      return { content: [{ type: "text", text: result }] };
     }
     throw new Error(`Unknown tool: ${req.params.name}`);
   } catch (e) {
