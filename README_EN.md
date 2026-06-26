@@ -1,6 +1,6 @@
 # MiniCPM Vision MCP 🎬👁️🎵
 
-Give your **DeepSeek V4.0 / Claude Desktop / Cursor** AI Agent sight AND hearing — a fully local vision + audio MCP server powered by **Ollama + MiniCPM-V 4.6 + faster-whisper**.
+Give **DeepSeek V4.0 and other single-modal LLMs** the power of sight and hearing — a fully local vision + audio MCP server powered by **Ollama + MiniCPM-V 4.6 + faster-whisper**.
 
 > Image description · Video frame analysis · Audio transcription · 100% local
 

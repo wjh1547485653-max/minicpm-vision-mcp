@@ -1,6 +1,6 @@
 # MiniCPM Vision MCP 🎬👁️🎵
 
-为 **DeepSeek V4.0 / Claude Desktop / Cursor** 等 AI Agent 装上眼睛和耳朵 —— 本地运行的视觉+音频 MCP 服务器，基于 **Ollama + MiniCPM-V 4.6 + faster-whisper**。
+为 **DeepSeek V4.0 等单模态大模型** 装上眼睛和耳朵 —— 本地运行的视觉+音频 MCP 服务器，基于 **Ollama + MiniCPM-V 4.6 + faster-whisper**。
 
 > 图片描述 · 视频帧分析 · 音频语音转文字 · 完全本地 · 数据不出机
 
@@ -46,6 +46,15 @@ pip install faster-whisper
 }
 ```
 
+**Reasonix** (`reasonix.toml`)：
+
+```toml
+[[plugins]]
+name    = "vision"
+command = "node"
+args    = ["/path/to/vision_mcp_server.mjs"]
+```
+
 重启客户端即可使用。
 
 ## 🛠️ 工具
@@ -86,7 +95,7 @@ URL/文件 → 下载 → FFmpeg 提取关键帧 → MiniCPM-V 逐帧分析 → 
 
 ## 🌍 适用场景
 
-- 📸 让 AI 看懂你发的截图和照片
+- 📸 让 DeepSeek 等纯文本模型看懂截图和照片
 - 🎬 快速了解视频内容，不用逐秒观看
 - 🎵 提取视频中的语音并转文字
 - 📱 分析抖音/B站等平台视频
