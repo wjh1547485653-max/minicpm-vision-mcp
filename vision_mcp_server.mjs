@@ -210,17 +210,31 @@ async function describeAudio(videoPathOrUrl) {
   let output = `🎵 音频分析\n`;
   output += `时长: ${info.duration}秒 | 编码: ${info.codec} | 采样率: ${info.sampleRate}Hz | 声道: ${info.channels}\n`;
   output += `文件大小: ${sizeMB}MB\n`;
-  output += `\n⚠️ 语音转文字需要 whisper 模型（faster-whisper 安装中）。当前提供音频元数据。\n`;
-  output += `音频已提取到: ${audioPath}\n`;
+
+  // Try transcription with faster-whisper
+  try {
+    const transcribeScript = join(__dirname, "transcribe_audio.py");
+    if (existsSync(transcribeScript)) {
+      const result = run(`D:/Python312/python.exe "${transcribeScript}" "${audioPath}" tiny`, true);
+      const data = JSON.parse(result);
+      if (data.segments && data.segments.length > 0) {
+        output += `\n📝 语音转文字 (faster-whisper tiny, 语言: ${data.language}):\n`;
+        output += data.segments.join('\n');
+      }
+    }
+  } catch (e) {
+    output += `\n⚠️ 转录失败: ${e.message}\n`;
+  }
 
   // Cleanup
   if (downloaded && existsSync(videoPath)) rmSync(videoPath);
+  if (audioPath !== videoPathOrUrl && existsSync(audioPath)) rmSync(audioPath);
 
   return output;
 }
 
 // --- MCP Server ---
-const server = new Server({ name: "minicpm-vision", version: "2.1.0" }, { capabilities: { tools: {} } });
+const server = new Server({ name: "minicpm-vision", version: "2.2.0" }, { capabilities: { tools: {} } });
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
