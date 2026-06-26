@@ -1,0 +1,37 @@
+{
+  "name": "minicpm-vision-mcp",
+  "version": "2.0.0",
+  "description": "Local vision MCP server for DeepSeek/Claude — image description + video frame analysis via Ollama + MiniCPM-V 4.6",
+  "main": "vision_mcp_server.mjs",
+  "type": "module",
+  "bin": {
+    "minicpm-vision-mcp": "./vision_mcp_server.mjs"
+  },
+  "files": [
+    "vision_mcp_server.mjs"
+  ],
+  "keywords": [
+    "mcp",
+    "vision",
+    "ollama",
+    "minicpm",
+    "deepseek",
+    "video-analysis",
+    "image-description",
+    "model-context-protocol",
+    "ai-agent",
+    "local-ai"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wjh1547485653-max/minicpm-vision-mcp"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
