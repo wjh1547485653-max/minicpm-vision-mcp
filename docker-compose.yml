@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  minicpm-vision:
+    build: .
+    network_mode: host
+    environment:
+      - OLLAMA_HOST=127.0.0.1:11434
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
